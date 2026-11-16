@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>كيف تعمل الاتصالات عبر الأقمار الصناعية — محاكاة هندسية</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#040b1a; --bg2:#081631; --panel:rgba(12,28,58,.78); --panel2:rgba(8,20,44,.9);
+  --line:rgba(110,180,255,.16); --line2:rgba(110,180,255,.32);
+  --cyan:#22e4ff; --blue:#4da3ff; --orange:#ff9a3c; --green:#3dffa8; --cell:#7fd8ff;
+  --text:#e7f1ff; --muted:#8ea5c9; --dim:#5d7397;
+  --ar:'IBM Plex Sans Arabic', 'Segoe UI', Tahoma, sans-serif;
+  --mono:'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:radial-gradient(1200px 700px at 70% -10%,#0d2552 0%,var(--bg) 60%) fixed,var(--bg);color:var(--text);font-family:var(--ar);}
+body{min-height:100vh;padding:14px clamp(10px,2vw,24px) 28px}
+.en{font-family:var(--mono);direction:ltr;unicode-bidi:isolate;letter-spacing:-.01em}
+button{font-family:inherit}
+
+/* header */
+.top{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:12px}
+.brand{display:flex;align-items:center;gap:12px}
+.logo{width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,rgba(34,228,255,.25),rgba(77,163,255,.08));border:1px solid var(--line2);display:grid;place-items:center;box-shadow:0 0 24px rgba(34,228,255,.15) inset}
+h1{font-size:clamp(18px,2.2vw,26px);margin:0;font-weight:700;letter-spacing:0}
+.sub{color:var(--muted);font-size:13px;margin-top:2px}
+.badges{display:flex;gap:6px;flex-wrap:wrap}
+.badge{font-size:11.5px;padding:5px 10px;border-radius:999px;border:1px solid var(--line2);background:rgba(10,30,64,.6);color:#bfe9ff}
+.badge.live{border-color:rgba(61,255,168,.45);color:var(--green)}
+.badge.live::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--green);margin-inline-end:6px;box-shadow:0 0 8px var(--green);animation:blink 1.4s infinite}
+@keyframes blink{50%{opacity:.25}}
+
+/* layout */
+.layout>section{min-width:0}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:14px;align-items:start}
+@media (max-width:1020px){.layout{grid-template-columns:minmax(0,1fr)}.panel{position:static}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;backdrop-filter:blur(8px)}
+
+/* caption */
+.caption{padding:12px 16px;margin-bottom:10px;display:grid;grid-template-columns:auto 1fr;gap:4px 14px;align-items:center}
+.stepno{grid-row:span 2;width:56px;height:56px;border-radius:14px;border:1px solid var(--line2);display:grid;place-items:center;text-align:center;background:linear-gradient(180deg,rgba(34,228,255,.12),transparent)}
+.stepno b{font-size:24px;line-height:1;color:var(--cyan);font-family:var(--mono)}
+.stepno small{display:block;font-size:10px;color:var(--muted)}
+.caption h2{margin:0;font-size:clamp(17px,2vw,22px);font-weight:700}
+.caption p{margin:0;color:#b9c9e3;font-size:13.5px;line-height:1.75}
+.tags{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.tag{font-family:var(--mono);direction:ltr;font-size:11.5px;padding:4px 9px;border-radius:7px;background:rgba(34,228,255,.07);border:1px solid rgba(34,228,255,.25);color:#aef3ff;animation:tagIn .45s both}
+.tag:nth-child(2){animation-delay:.08s}.tag:nth-child(3){animation-delay:.16s}.tag:nth-child(4){animation-delay:.24s}.tag:nth-child(5){animation-delay:.32s}
+@keyframes tagIn{from{opacity:0;transform:translateY(6px)}}
+.caption.swap h2,.caption.swap p{animation:fadeIn .5s both}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}}
+
+/* stage */
+.stage-wrap{position:relative;border-radius:16px;overflow:hidden;border:1px solid var(--line2);background:#030916;box-shadow:0 20px 60px rgba(0,0,0,.45),0 0 0 1px rgba(34,228,255,.05) inset}
+#stage{display:block;width:100%;height:auto;aspect-ratio:1200/680;direction:ltr}
+.hint{position:absolute;bottom:8px;left:10px;font-size:11.5px;color:var(--muted);background:rgba(3,10,24,.7);padding:4px 9px;border-radius:8px;border:1px solid var(--line);pointer-events:none}
+.corner{position:absolute;top:8px;left:10px;font-size:11px;color:var(--muted);background:rgba(3,10,24,.7);padding:4px 9px;border-radius:8px;border:1px solid var(--line);pointer-events:none;direction:ltr;font-family:var(--mono)}
+.focus-note{position:absolute;top:8px;right:10px;max-width:min(380px,70%);font-size:12.5px;line-height:1.7;background:rgba(3,12,30,.88);border:1px solid var(--line2);border-radius:12px;padding:9px 12px;display:none}
+.focus-note.show{display:block;animation:fadeIn .35s}
+.focus-note b{color:var(--cyan)}
+
+/* svg styles */
+#stage text{font-family:var(--ar);fill:#d8e8ff}
+#stage .mono{font-family:var(--mono)}
+#stage .lbl{font-size:15px;font-weight:600;text-anchor:middle}
+#stage .lbl-en{font-size:11.5px;fill:#86a6cf;text-anchor:middle;font-family:var(--mono)}
+#stage .comp{cursor:pointer;transition:filter .4s}
+#stage .comp:hover{filter:drop-shadow(0 0 8px rgba(34,228,255,.9))}
+#stage .comp.focus{filter:drop-shadow(0 0 10px rgba(34,228,255,.75))}
+#stage .link{fill:none;stroke-width:2;stroke-dasharray:6 7;opacity:.22;transition:opacity .5s}
+#stage .link.on{opacity:.85;animation:dash 1s linear infinite}
+#stage .link.ul.fwd{stroke:var(--blue)} #stage .link.dl.fwd{stroke:var(--orange)}
+#stage .link.gnd.fwd{stroke:var(--cyan)} #stage .link.ret{stroke:var(--green)}
+#stage .link.ret{opacity:.1}
+#stage .link.ret.on{opacity:.75}
+#stage .fiber{fill:none;stroke-width:2}
+@keyframes dash{to{stroke-dashoffset:-26}}
+#stage .det{opacity:0;transition:opacity .5s;pointer-events:none}
+body.detailed #stage .det{opacity:1}
+#stage .ul,#stage .dl,#stage .gnd{transition:opacity .4s}
+#stage.focus-ul .dl,#stage.focus-ul .gnd{opacity:.06!important}
+#stage.focus-dl .ul,#stage.focus-dl .gnd{opacity:.06!important}
+#stage.focus-ul .ul.link,#stage.focus-dl .dl.link{opacity:.9!important}
+.linklbl{font-family:var(--mono)!important;font-size:13px;font-weight:600}
+@media (max-width:700px){
+  #stage .lbl{font-size:22px} #stage .lbl-en{font-size:16px}
+  .linklbl{font-size:18px}
+  .hint{display:none}
+}
+
+/* legend */
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;padding:9px 14px;margin-top:10px;font-size:12px;color:#b9c9e3;align-items:center}
+.lg{display:flex;align-items:center;gap:7px}
+.dot{width:11px;height:11px;border-radius:50%;box-shadow:0 0 8px currentColor}
+.sq{width:16px;height:10px;border-radius:2px;border:1.5px solid currentColor;background:rgba(0,0,0,.4)}
+
+/* controls */
+.controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;padding:10px 12px;margin-top:10px}
+.grp{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.grp-lbl{font-size:11.5px;color:var(--muted);margin-inline-end:2px}
+.btn{height:38px;min-width:38px;padding:0 12px;border-radius:10px;border:1px solid var(--line2);background:rgba(14,36,74,.7);color:var(--text);font-size:13px;display:inline-flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;transition:all .2s}
+.btn:hover{border-color:var(--cyan);box-shadow:0 0 14px rgba(34,228,255,.25)}
+.btn.primary{background:linear-gradient(180deg,rgba(34,228,255,.28),rgba(34,228,255,.08));border-color:rgba(34,228,255,.6)}
+.btn svg{width:16px;height:16px;fill:currentColor}
+.seg{display:inline-flex;border:1px solid var(--line2);border-radius:10px;overflow:hidden;background:rgba(6,18,40,.7)}
+.seg button{height:34px;padding:0 11px;border:0;background:transparent;color:var(--muted);font-size:12.5px;cursor:pointer;border-inline-start:1px solid var(--line)}
+.seg button:first-child{border-inline-start:0}
+.seg button.on{background:rgba(34,228,255,.16);color:#fff}
+.seg button.en{font-family:var(--mono)}
+
+/* timeline */
+.timeline{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-top:10px}
+.chip{position:relative;overflow:hidden;border-radius:10px;border:1px solid var(--line);background:rgba(8,22,48,.7);padding:7px 8px 9px;cursor:pointer;text-align:start;color:var(--muted);font-size:11.5px;line-height:1.4;min-height:54px}
+.chip b{display:block;font-family:var(--mono);color:#7fa0cc;font-size:11px}
+.chip.on{border-color:rgba(34,228,255,.6);color:#fff;background:rgba(18,50,96,.75)}
+.chip.on b{color:var(--cyan)}
+.chip.done{color:#a9bcda}
+.chip .bar{position:absolute;bottom:0;right:0;height:3px;width:calc(var(--p,0)*100%);background:linear-gradient(90deg,var(--cyan),var(--blue))}
+.chip.done .bar{width:100%;opacity:.4}
+@media (max-width:700px){.timeline{grid-template-columns:repeat(7,minmax(70px,1fr));overflow-x:auto}.chip span{display:none}.chip{min-height:38px;text-align:center}}
+
+/* inset */
+.inset-card{margin-top:10px;padding:10px 12px 8px}
+.inset-head{display:flex;justify-content:space-between;align-items:center;font-size:12.5px;color:var(--muted);margin-bottom:4px;gap:10px}
+.inset-head b{color:#cfe6ff;font-weight:600}
+.inset-scroll{overflow-x:auto}
+#inset{display:block;width:100%;min-width:660px;height:auto;aspect-ratio:1000/210;direction:ltr}
+#inset text{font-family:var(--ar);fill:#d8e8ff}
+#inset .m{font-family:var(--mono)}
+.inset-card.hide{display:none}
+
+/* panel */
+.panel{padding:14px;position:sticky;top:12px}
+.panel h3{margin:0 0 8px;font-size:15px;display:flex;align-items:center;gap:8px}
+.panel h3::before{content:"";width:4px;height:16px;border-radius:2px;background:var(--cyan);box-shadow:0 0 8px var(--cyan)}
+.kv{display:grid;grid-template-columns:1fr auto;gap:0;border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:12px}
+.kv div{padding:8px 10px;font-size:12.5px;border-bottom:1px solid var(--line)}
+.kv div:nth-last-child(-n+2){border-bottom:0}
+.kv .k{color:var(--muted)}
+.kv .v{font-family:var(--mono);direction:ltr;text-align:left;color:#dff6ff;font-size:12.5px}
+.kv .k .en{font-size:11px;color:var(--dim);display:block}
+.live{border:1px solid rgba(34,228,255,.3);border-radius:12px;padding:10px;background:rgba(3,14,32,.6);margin-bottom:12px}
+.live-row{display:flex;justify-content:space-between;gap:8px;font-size:12.5px;padding:4px 0}
+.live-row span:first-child{color:var(--muted)}
+.live-row .v{font-family:var(--mono);direction:ltr;color:#fff;text-align:left}
+.latbig{font-family:var(--mono);font-size:26px;color:var(--cyan);direction:ltr;text-align:left;text-shadow:0 0 14px rgba(34,228,255,.5);margin:4px 0 2px}
+.latbar{height:8px;border-radius:5px;background:rgba(255,255,255,.06);overflow:hidden;position:relative}
+.latbar i{position:absolute;inset:0 auto 0 0;width:0;background:linear-gradient(90deg,var(--blue),var(--orange),var(--green));border-radius:5px}
+.latscale{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;color:var(--dim);direction:ltr;margin-top:3px}
+.note{font-size:11.5px;line-height:1.75;color:#a9bad6;background:rgba(255,154,60,.06);border:1px solid rgba(255,154,60,.25);border-radius:10px;padding:8px 10px}
+.note b{color:var(--orange)}
+
+/* info card */
+.info-card{position:absolute;bottom:10px;left:10px;width:min(360px,calc(100% - 20px));max-height:calc(100% - 20px);overflow:auto;background:rgba(4,14,34,.95);border:1px solid rgba(34,228,255,.45);border-radius:14px;padding:12px 14px;box-shadow:0 10px 40px rgba(0,0,0,.6),0 0 30px rgba(34,228,255,.12);animation:fadeIn .3s;z-index:5}
+.info-card h4{margin:0;font-size:16px}
+.info-card .en.t{color:var(--cyan);font-size:12px;display:block;margin:2px 0 8px}
+.info-card p{margin:0 0 8px;font-size:13px;line-height:1.8;color:#cbd9ef}
+.info-card ul{margin:0;padding-inline-start:18px;font-size:12.5px;line-height:1.8;color:#b9cbe6}
+.info-card .x{position:absolute;top:8px;left:8px;width:28px;height:28px;border-radius:8px;border:1px solid var(--line2);background:transparent;color:var(--text);cursor:pointer}
+@media (max-width:700px){.info-card{position:fixed;inset:auto 8px 8px 8px;width:auto;max-height:60vh}}
+
+/* modal */
+.modal{position:fixed;inset:0;background:rgba(1,5,14,.78);backdrop-filter:blur(6px);display:grid;place-items:center;z-index:20;padding:12px}
+.modal[hidden]{display:none}
+.modal-box{width:min(1020px,100%);max-height:94vh;overflow:auto;background:var(--panel2);border:1px solid var(--line2);border-radius:18px;padding:16px;position:relative}
+.modal-box h3{margin:0 0 4px;font-size:18px}
+.modal-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:16px;margin-top:10px}
+@media (max-width:820px){.modal-grid{grid-template-columns:1fr}}
+#orbit{width:100%;height:auto;aspect-ratio:1;display:block;background:radial-gradient(circle at 50% 50%,#0b1d42,#030916 70%);border-radius:14px;border:1px solid var(--line);direction:ltr}
+#orbit text{font-family:var(--mono);fill:#cfe3ff}
+table.cmp{width:100%;border-collapse:collapse;font-size:12.5px}
+table.cmp th,table.cmp td{border-bottom:1px solid var(--line);padding:8px 6px;text-align:start;vertical-align:top;line-height:1.6}
+table.cmp th{color:var(--muted);font-weight:500}
+table.cmp td.g{color:#ffd2a6} table.cmp td.l{color:#b6ffdd}
+.rtt{margin-top:12px}
+.rtt-row{display:grid;grid-template-columns:52px 1fr 90px;align-items:center;gap:8px;font-size:12px;margin:6px 0}
+.rtt-row .bar{height:12px;border-radius:6px;background:rgba(255,255,255,.06);overflow:hidden}
+.rtt-row .bar i{display:block;height:100%;border-radius:6px}
+.close{position:absolute;top:12px;left:12px}
+</style>
+</head>
+<body class="">
+
+<header class="top">
+  <div class="brand">
+    <div class="logo">
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#22e4ff" stroke-width="1.6"><rect x="9" y="9" width="6" height="6" rx="1"/><path d="M3 7l6 4M21 7l-6 4M3 17l6-4M21 17l-6-4"/><circle cx="12" cy="12" r="10" stroke-opacity=".3"/></svg>
+    </div>
+    <div>
+      <h1>كيف تعمل الاتصالات عبر الأقمار الصناعية؟</h1>
+      <div class="sub">سيناريو بحري: سفينة في بحر العرب ← هاتف محمول في مسقط · <span class="en">How Satellite Communication Works</span></div>
+    </div>
+  </div>
+  <div class="badges">
+    <span class="badge live">محاكاة تفاعلية</span>
+    <span class="badge en">GEO · Ku-band · VSAT</span>
+    <span class="badge en">Bent-pipe Transponder</span>
+  </div>
+</header>
+
+<main class="layout">
+<section>
+  <div class="caption card" id="caption">
+    <div class="stepno"><div><b id="capNo">1</b><small>من 7</small></div></div>
+    <h2 id="capTitle"></h2>
+    <p id="capSub"></p>
+    <div class="tags" id="capTags"></div>
+  </div>
+
+  <div class="stage-wrap">
+    <svg id="stage" viewBox="0 0 1200 680" role="img" aria-label="مخطط متحرك لمسار مكالمة عبر قمر صناعي من سفينة إلى هاتف في مسقط">
+      <defs>
+        <radialGradient id="gSky" cx="50%" cy="0%" r="90%">
+          <stop offset="0" stop-color="#0d2552"/><stop offset=".55" stop-color="#061230"/><stop offset="1" stop-color="#030916"/>
+        </radialGradient>
+        <linearGradient id="gSea" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#0d3f6e"/><stop offset=".4" stop-color="#082c52"/><stop offset="1" stop-color="#041a33"/>
+        </linearGradient>
+        <linearGradient id="gLand" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#3a3529"/><stop offset=".15" stop-color="#26241f"/><stop offset="1" stop-color="#121417"/>
+        </linearGradient>
+        <linearGradient id="gPanel" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#1d3f8a"/><stop offset="1" stop-color="#0c2257"/>
+        </linearGradient>
+        <linearGradient id="gGold" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#ffd27a"/><stop offset=".5" stop-color="#c9902f"/><stop offset="1" stop-color="#8a5b15"/>
+        </linearGradient>
+        <linearGradient id="gHull" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#3b4a63"/><stop offset="1" stop-color="#1c2638"/>
+        </linearGradient>
+        <linearGradient id="gDish" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stop-color="#9fb3cc"/><stop offset=".5" stop-color="#e9f1fb"/><stop offset="1" stop-color="#8ea2bd"/>
+        </linearGradient>
+        <filter id="glow" x="-100%" y="-100%" width="300%" height="300%">
+          <feGaussianBlur stdDeviation="3.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+        <filter id="softglow" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="8"/>
+        </filter>
+        <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+          <path d="M40 0H0V40" fill="none" stroke="rgba(110,180,255,.05)" stroke-width="1"/>
+        </pattern>
+      </defs>
+
+      <rect width="1200" height="680" fill="url(#gSky)"/>
+      <rect width="1200" height="680" fill="url(#grid)"/>
+      <g id="stars"></g>
+
+      <!-- GEO orbit arc (decorative) -->
+      <path d="M-50,190 Q600,40 1250,190" fill="none" stroke="rgba(120,190,255,.22)" stroke-width="1.5" stroke-dasharray="3 6"/>
+      <text x="1010" y="128" class="mono" font-size="12" fill="#6f8fbd" transform="rotate(7 1010 128)">GEO ARC · 0° LAT (EQUATOR)</text>
+
+      <!-- Earth -->
+      <path d="M0,480 Q300,455 600,450 Q900,450 1200,480 L1200,680 L0,680 Z" fill="url(#gSea)"/>
+      <path d="M0,480 Q300,455 600,450 Q900,450 1200,480" fill="none" stroke="#5fc8ff" stroke-width="6" opacity=".35" filter="url(#softglow)"/>
+      <path d="M0,480 Q300,455 600,450 Q900,450 1200,480" fill="none" stroke="#7fd8ff" stroke-width="1.2" opacity=".6"/>
+      <g id="waves" stroke="rgba(150,210,255,.18)" stroke-width="1.2" fill="none"></g>
+      <path d="M470,470 C520,455 560,450 600,448 Q900,440 1200,470 L1200,680 L470,680 C490,600 455,530 470,470 Z" fill="url(#gLand)"/>
+      <path d="M470,470 C520,455 560,450 600,448 Q900,440 1200,470" fill="none" stroke="#8b7a55" stroke-width="1.5" opacity=".6"/>
+      <text x="150" y="610" class="lbl" fill="#7fb6e6" opacity=".7">بحر العرب</text>
+      <text x="150" y="628" class="lbl-en">ARABIAN SEA</text>
+      <text x="1040" y="640" class="lbl" fill="#c9b78f" opacity=".75">مسقط، سلطنة عُمان</text>
+      <text x="1040" y="658" class="lbl-en">MUSCAT, OMAN</text>
+
+      <!-- Muscat skyline -->
+      <g fill="#1a2233" stroke="#2a3a55" stroke-width="1">
+        <rect x="990" y="408" width="26" height="50"/><rect x="1020" y="420" width="20" height="40"/>
+        <rect x="1150" y="400" width="24" height="64"/><rect x="1176" y="418" width="22" height="50"/>
+        <path d="M1118,465 V430 a22,22 0 0 1 44,0 V465 Z"/>
+        <rect x="1166" y="378" width="6" height="88"/><path d="M1164,378 l5,-12 l5,12 z"/>
+        <rect x="1108" y="390" width="6" height="76"/><path d="M1106,390 l5,-12 l5,12 z"/>
+      </g>
+      <g fill="#ffd27a" opacity=".55">
+        <rect x="995" y="416" width="4" height="4"/><rect x="1005" y="428" width="4" height="4"/><rect x="1025" y="430" width="4" height="4"/>
+        <rect x="1155" y="410" width="4" height="4"/><rect x="1180" y="430" width="4" height="4"/><rect x="1162" y="426" width="4" height="4"/>
+      </g>
+
+      <!-- altitude annotation (detailed) -->
+      <g class="det">
+        <line x1="700" y1="112" x2="700" y2="440" stroke="#8fb4e6" stroke-width="1" stroke-dasharray="4 4"/>
+        <path d="M694,122 L700,110 L706,122 M694,430 L700,442 L706,430" fill="none" stroke="#8fb4e6" stroke-width="1.4"/>
+        <rect x="708" y="250" width="176" height="44" rx="6" fill="rgba(3,12,30,.85)" stroke="rgba(143,180,230,.4)"/>
+        <text x="796" y="268" class="mono" font-size="13" text-anchor="middle" fill="#cfe6ff">≈ 35,786 km</text>
+        <text x="796" y="286" font-size="12" text-anchor="middle" fill="#8fa6c8">ليس بمقياس رسم حقيقي</text>
+      </g>
+
+      <!-- LINKS (also geometry for pulses) -->
+      <g id="links">
+        <path id="pUp" class="link ul fwd" d="M185,384 L594,140"/>
+        <path id="pRetDown" class="link dl ret" d="M598,148 L190,392"/>
+        <path id="pDown" class="link dl fwd" d="M606,140 L565,384"/>
+        <path id="pRetUp" class="link ul ret" d="M575,385 L616,141"/>
+        <path id="gFwd" class="link gnd fwd" d="M565,452 L565,462 L930,462 L930,452"/>
+        <path id="gRet" class="link gnd ret" d="M937,452 L937,471 L573,471 L573,452"/>
+        <path id="rFwd" class="link gnd fwd" d="M938,352 Q1015,385 1076,462"/>
+        <path id="rRet" class="link gnd ret" d="M1092,462 Q1035,368 946,348"/>
+      </g>
+      <g id="linkLabels">
+        <text class="linklbl ul" x="372" y="246" fill="#8cc4ff" transform="rotate(-30.8 372 246)" text-anchor="middle">UPLINK · 14 GHz</text>
+        <text class="linklbl ul det" x="398" y="284" fill="#8cc4ff" transform="rotate(-30.8 398 284)" text-anchor="middle" font-size="11">QPSK · Ku-band · ≈ 36,000 km</text>
+        <text class="linklbl dl" x="556" y="300" fill="#ffc08a" transform="rotate(-80.5 556 300)" text-anchor="middle">DOWNLINK · 12 GHz</text>
+        <text class="linklbl gnd det" x="748" y="489" fill="#7fe8ff" text-anchor="middle" font-size="11">FIBER / IP BACKBONE · RTP/UDP/IP</text>
+        <text class="linklbl gnd det" x="1030" y="365" fill="#a9e6ff" text-anchor="middle" font-size="11" transform="rotate(32 1030 365)">LTE / 5G NR</text>
+      </g>
+
+      <!-- SATELLITE -->
+      <g id="cSat" class="comp" data-info="sat">
+        <circle id="satHalo" cx="600" cy="112" r="60" fill="rgba(34,228,255,.12)" filter="url(#softglow)" opacity=".5"/>
+        <g transform="translate(600,112)">
+          <line x1="-120" y1="0" x2="120" y2="0" stroke="#7d8da8" stroke-width="2"/>
+          <g>
+            <rect x="-122" y="-14" width="88" height="28" fill="url(#gPanel)" stroke="#5f86d6" stroke-width="1"/>
+            <path d="M-100,-14V14M-78,-14V14M-56,-14V14M-122,0H-34" stroke="#5f86d6" stroke-width=".7"/>
+            <rect x="34" y="-14" width="88" height="28" fill="url(#gPanel)" stroke="#5f86d6" stroke-width="1"/>
+            <path d="M56,-14V14M78,-14V14M100,-14V14M34,0H122" stroke="#5f86d6" stroke-width=".7"/>
+          </g>
+          <rect x="-22" y="-20" width="44" height="40" rx="3" fill="url(#gGold)" stroke="#ffe0a0" stroke-width="1"/>
+          <path d="M-22,-6H22M-22,8H22" stroke="#7a4f12" stroke-width=".8" opacity=".6"/>
+          <path d="M-18,20 Q-8,36 2,20 Z" fill="url(#gDish)" stroke="#cfdcee"/>
+          <path d="M2,20 Q12,34 20,20 Z" fill="url(#gDish)" stroke="#cfdcee"/>
+          <line x1="0" y1="-20" x2="0" y2="-32" stroke="#cfdcee" stroke-width="1.5"/>
+          <circle cx="0" cy="-33" r="2.5" fill="#22e4ff"/>
+        </g>
+        <text x="800" y="104" class="lbl">القمر الصناعي</text>
+        <text x="800" y="120" class="lbl-en">GEO SATELLITE · BENT-PIPE</text>
+      </g>
+
+      <!-- SHIP -->
+      <g id="cShip" class="comp" data-info="ship">
+        <g id="shipBody" transform="translate(220,462)">
+          <path d="M-115,-12 L118,-12 L96,16 L-98,16 Z" fill="url(#gHull)" stroke="#5c6f8f" stroke-width="1"/>
+          <path d="M-104,4 L106,4 L96,16 L-98,16 Z" fill="#7a2531" opacity=".85"/>
+          <rect x="-8" y="-30" width="22" height="18" fill="#2f6fb0"/><rect x="16" y="-30" width="22" height="18" fill="#c46a2a"/>
+          <rect x="40" y="-30" width="22" height="18" fill="#2e8a6a"/><rect x="64" y="-30" width="22" height="18" fill="#9a3b46"/>
+          <rect x="4" y="-46" width="22" height="16" fill="#c49a2a"/><rect x="28" y="-46" width="22" height="16" fill="#3a5fa0"/>
+          <rect x="-78" y="-48" width="58" height="36" fill="#e3e9f2" stroke="#9fb0c8"/>
+          <rect x="-74" y="-60" width="48" height="13" fill="#d3dbe7" stroke="#9fb0c8"/>
+          <g fill="#14304f"><rect x="-72" y="-57" width="7" height="6"/><rect x="-62" y="-57" width="7" height="6"/><rect x="-52" y="-57" width="7" height="6"/><rect x="-42" y="-57" width="7" height="6"/><rect x="-32" y="-57" width="5" height="6"/></g>
+          <g fill="#14304f" opacity=".7"><rect x="-72" y="-40" width="6" height="5"/><rect x="-60" y="-40" width="6" height="5"/><rect x="-48" y="-40" width="6" height="5"/><rect x="-36" y="-40" width="6" height="5"/></g>
+          <rect x="-38" y="-70" width="6" height="10" fill="#9fb0c8"/>
+          <ellipse id="radome" cx="-35" cy="-79" rx="15" ry="14" fill="#f4f8fd" stroke="#bccbe0"/>
+          <path d="M-48,-79 H-22" stroke="#cdd8e8" stroke-width=".8"/>
+          <line x1="-64" y1="-60" x2="-64" y2="-86" stroke="#9fb0c8" stroke-width="1.5"/>
+          <circle cx="-64" cy="-88" r="2" fill="#ff5a5a"/>
+          <!-- person with handset -->
+          <g id="person" transform="translate(-92,-26)">
+            <circle cx="0" cy="-10" r="4" fill="#ffd9b0"/>
+            <path d="M-4,-5 h8 v12 h-8z" fill="#ff9a3c"/>
+            <path d="M3,-12 l4,2 l-1,5" stroke="#cfe6ff" stroke-width="2" fill="none"/>
+            <g id="speech" opacity="0" stroke="#22e4ff" fill="none" stroke-width="1.6">
+              <path d="M10,-16 q4,4 0,8"/><path d="M14,-19 q7,7 0,14"/><path d="M18,-22 q10,10 0,20"/>
+            </g>
+          </g>
+        </g>
+        <text x="220" y="528" class="lbl">السفينة (محطة طرفية بحرية)</text>
+        <text x="220" y="545" class="lbl-en">MARITIME VSAT TERMINAL</text>
+      </g>
+
+      <!-- GATEWAY -->
+      <g id="cGw" class="comp" data-info="gw">
+        <g transform="translate(565,418)">
+          <rect x="-40" y="18" width="80" height="16" fill="#1d2a40" stroke="#3b557d"/>
+          <rect x="-7" y="0" width="14" height="20" fill="#7b8ea9"/>
+          <path d="M-40,-8 Q0,24 40,-8 Z" fill="url(#gDish)" stroke="#e8f0fb" stroke-width="1"/>
+          <ellipse cx="0" cy="-8" rx="40" ry="7" fill="#c9d6e6" stroke="#f2f7fd" stroke-width="1"/>
+          <path d="M-30,-8 L0,-34 L30,-8" stroke="#aebdd2" stroke-width="1.2" fill="none"/>
+          <circle id="gwFeed" cx="0" cy="-34" r="3.5" fill="#ff9a3c"/>
+          <g fill="#22e4ff"><circle cx="-28" cy="26" r="1.6"/><circle cx="-20" cy="26" r="1.6"/><circle cx="-12" cy="26" r="1.6"/></g>
+        </g>
+        <text x="565" y="505" class="lbl">المحطة الأرضية</text>
+        <text x="565" y="521" class="lbl-en">GROUND GATEWAY</text>
+      </g>
+
+      <!-- ROUTER -->
+      <g id="cRouter" class="comp" data-info="router">
+        <line x1="680" y1="452" x2="680" y2="462" stroke="#22e4ff" stroke-width="1.5" opacity=".6"/>
+        <rect x="660" y="430" width="40" height="22" rx="4" fill="#0f2547" stroke="#3a8fd6"/>
+        <path d="M668,441 h10 m-3,-3 l3,3 l-3,3 M692,441 h-10" stroke="#7fe8ff" stroke-width="1.4" fill="none"/>
+        <g class="det"><text x="680" y="424" class="lbl-en" font-size="10">IP ROUTER</text></g>
+      </g>
+
+      <!-- CORE NETWORK -->
+      <g id="cCore" class="comp" data-info="core">
+        <line x1="800" y1="452" x2="800" y2="462" stroke="#22e4ff" stroke-width="1.5" opacity=".6"/>
+        <rect x="752" y="386" width="96" height="66" rx="5" fill="#0d1f3d" stroke="#3a6fae"/>
+        <g id="racks">
+          <rect x="760" y="394" width="22" height="52" fill="#081530" stroke="#2a4a7a"/>
+          <rect x="789" y="394" width="22" height="52" fill="#081530" stroke="#2a4a7a"/>
+          <rect x="818" y="394" width="22" height="52" fill="#081530" stroke="#2a4a7a"/>
+        </g>
+        <g id="leds"></g>
+        <text x="800" y="505" class="lbl">الشبكة الأساسية</text>
+        <text x="800" y="521" class="lbl-en">CORE NETWORK</text>
+        <g class="det"><text x="800" y="378" class="lbl-en" font-size="10">IMS · SOFTSWITCH · SBC</text></g>
+      </g>
+
+      <!-- TOWER -->
+      <g id="cTower" class="comp" data-info="tower">
+        <g transform="translate(930,452)" stroke="#9fb3cc" stroke-width="1.6" fill="none">
+          <path d="M-18,0 L0,-104 L18,0"/>
+          <path d="M-14,-22 L12,-22 M-10,-44 L9,-44 M-7,-66 L6,-66 M-14,-22 L9,-44 L-7,-66 L6,-88 M12,-22 L-10,-44 L6,-66"/>
+          <rect x="-11" y="-104" width="5" height="16" fill="#cfdcee" stroke="none"/>
+          <rect x="6" y="-104" width="5" height="16" fill="#cfdcee" stroke="none"/>
+          <circle cx="0" cy="-108" r="2.5" fill="#ff5a5a" stroke="none"/>
+        </g>
+        <g id="towerRings" fill="none" stroke="#7fd8ff" stroke-width="1.4" opacity="0">
+          <path d="M944,342 q8,8 0,16"/><path d="M950,336 q14,14 0,28"/>
+          <path d="M916,342 q-8,8 0,16"/><path d="M910,336 q-14,14 0,28"/>
+        </g>
+        <text x="930" y="505" class="lbl">محطة قاعدية</text>
+        <text x="930" y="521" class="lbl-en">4G/5G eNodeB / gNodeB</text>
+      </g>
+
+      <!-- PHONE -->
+      <g id="cPhone" class="comp" data-info="phone">
+        <g id="phoneBody" transform="translate(1090,500)">
+          <rect x="-21" y="-38" width="42" height="76" rx="7" fill="#101827" stroke="#7e93b3" stroke-width="1.5"/>
+          <rect id="phScreen" x="-17" y="-32" width="34" height="62" rx="3" fill="#0b2a4a"/>
+          <circle cx="0" cy="-35" r="1.2" fill="#7e93b3"/>
+          <g id="phIcon">
+            <circle id="phBtn" cx="0" cy="14" r="7" fill="#2ac46a"/>
+            <path d="M-3,12 q1,-2 2,0 l1,2 q3,2 4,0" stroke="#fff" stroke-width="1.4" fill="none"/>
+          </g>
+          <text id="phText" x="0" y="-12" text-anchor="middle" font-size="7.5" class="mono" fill="#cfe6ff">IDLE</text>
+          <text id="phText2" x="0" y="-2" text-anchor="middle" font-size="6.5" class="mono" fill="#7fa0cc">VoLTE</text>
+        </g>
+        <g id="phRings" fill="none" stroke="#3dffa8" stroke-width="1.6" opacity="0">
+          <path d="M1118,480 q9,10 0,20"/><path d="M1125,474 q15,16 0,32"/>
+          <path d="M1062,480 q-9,10 0,20"/><path d="M1055,474 q-15,16 0,32"/>
+        </g>
+        <text x="1090" y="560" class="lbl">الهاتف في مسقط</text>
+        <text x="1090" y="576" class="lbl-en">SMARTPHONE · 4G/5G</text>
+      </g>
+
+      <g id="pulses"></g>
+    </svg>
+    <div class="corner" id="corner">SIM · NOT TO SCALE</div>
+    <div class="focus-note" id="focusNote"></div>
+    <div class="hint">انقر على أي مكوّن لعرض وصفه التقني</div>
+    <div class="info-card" id="infoCard" hidden></div>
+  </div>
+
+  <div class="legend card">
+    <span class="lg" style="color:var(--blue)"><i class="dot" style="background:var(--blue)"></i><span>إشارة RF صاعدة <span class="en">Uplink 14 GHz</span></span></span>
+    <span class="lg" style="color:var(--orange)"><i class="dot" style="background:var(--orange)"></i><span>إشارة RF هابطة <span class="en">Downlink 12 GHz</span></span></span>
+    <span class="lg" style="color:var(--cyan)"><i class="sq"></i><span>حزم بيانات رقمية <span class="en">IP Packets</span></span></span>
+    <span class="lg" style="color:var(--cell)"><i class="dot" style="background:var(--cell)"></i><span>راديو خلوي <span class="en">4G/5G</span></span></span>
+    <span class="lg" style="color:var(--green)"><i class="dot" style="background:var(--green)"></i><span>مسار الرد <span class="en">Return Path</span></span></span>
+  </div>
+
+  <div class="controls card">
+    <div class="grp">
+      <button class="btn primary" id="bPlay" aria-label="تشغيل / إيقاف"><svg viewBox="0 0 24 24" id="icPlay"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg><span id="tPlay">إيقاف مؤقت</span></button>
+      <button class="btn" id="bRestart" title="إعادة التشغيل"><svg viewBox="0 0 24 24"><path d="M12 5V2L7 6l5 4V7a5 5 0 1 1-5 5H5a7 7 0 1 0 7-7z"/></svg>إعادة</button>
+      <button class="btn" id="bPrev" title="المرحلة السابقة"><svg viewBox="0 0 24 24"><path d="M8 5l8 7-8 7z"/></svg>السابق</button>
+      <button class="btn" id="bNext" title="المرحلة التالية">التالي<svg viewBox="0 0 24 24"><path d="M16 5L8 12l8 7z"/></svg></button>
+    </div>
+    <div class="grp">
+      <span class="grp-lbl">السرعة</span>
+      <div class="seg" id="segSpeed"><button class="en" data-v="0.5">0.5×</button><button class="en on" data-v="1">1×</button><button class="en" data-v="2">2×</button></div>
+    </div>
+    <div class="grp">
+      <span class="grp-lbl">الوصلة</span>
+      <div class="seg" id="segFocus"><button class="on" data-v="all">الكل</button><button class="en" data-v="ul">Uplink</button><button class="en" data-v="dl">Downlink</button></div>
+    </div>
+    <div class="grp">
+      <span class="grp-lbl">العرض</span>
+      <div class="seg" id="segView"><button class="on" data-v="simple">مبسّط</button><button data-v="detailed">هندسي مفصّل</button></div>
+    </div>
+    <button class="btn" id="bCmp"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 2a8 8 0 1 1 0 16 8 8 0 0 1 0-16z" opacity=".6"/></svg>مقارنة <span class="en">GEO vs LEO</span></button>
+  </div>
+
+  <div class="timeline" id="timeline"></div>
+
+  <div class="inset-card card" id="insetCard">
+    <div class="inset-head"><b id="insetTitle">عرض مكبّر</b><span class="en" id="insetEn"></span></div>
+    <div class="inset-scroll"><svg id="inset" viewBox="0 0 1000 210"></svg></div>
+  </div>
+</section>
+
+<aside class="panel card">
+  <h3>لوحة المعلومات الهندسية</h3>
+  <div class="live">
+    <div class="live-row"><span>المرحلة الحالية</span><span class="v" id="lvScene">1 / 7</span></div>
+    <div class="live-row"><span>نوع الإشارة</span><span class="v" id="lvSignal">—</span></div>
+    <div class="live-row"><span>الاتجاه</span><span class="v" id="lvDir">—</span></div>
+    <div style="font-size:12px;color:var(--muted);margin-top:6px">زمن الانتشار الحقيقي المقابل <span class="en" style="font-size:11px">(Propagation Delay)</span></div>
+    <div class="latbig" id="lvLat">0.0 ms</div>
+    <div class="latbar"><i id="lvBar"></i></div>
+    <div class="latscale"><span>0</span><span>119</span><span>239</span><span>358</span><span>477 ms</span></div>
+    <div class="live-row" style="margin-top:6px"><span>إبطاء الحركة للعرض</span><span class="v" id="lvSlow">—</span></div>
+  </div>
+
+  <div class="kv">
+    <div class="k">مدار القمر<span class="en">Satellite Orbit</span></div><div class="v">GEO</div>
+    <div class="k">الارتفاع<span class="en">Satellite Altitude</span></div><div class="v">35,786 km</div>
+    <div class="k">تردد الوصلة الصاعدة<span class="en">Uplink Frequency</span></div><div class="v">14 GHz (example)</div>
+    <div class="k">تردد الوصلة الهابطة<span class="en">Downlink Frequency</span></div><div class="v">12 GHz (example)</div>
+    <div class="k">التعديل<span class="en">Modulation</span></div><div class="v">QPSK (example)</div>
+    <div class="k">سرعة الانتشار<span class="en">Propagation Speed</span></div><div class="v">≈ 300,000 km/s</div>
+    <div class="k">زمن الذهاب والإياب المثالي<span class="en">Ideal GEO RTT</span></div><div class="v">≈ 477 ms</div>
+  </div>
+
+  <div class="note">
+    <b>تنبيه هندسي:</b> هذه القيم توضيحية لنظام <span class="en">VSAT</span> نموذجي يعمل عبر قمر <span class="en">GEO</span> في نطاق <span class="en">Ku-band</span>، ولا تمثّل كل خدمات الاتصالات الفضائية. زمن <span class="en">477 ms</span> هو زمن الانتشار المثالي لأربع قفزات (سفينة ← قمر ← بوابة ← قمر ← سفينة) عند الارتفاع الرأسي فقط، دون زمن المعالجة أو الشبكة الأرضية أو المسافة المائلة الإضافية. سرعة الحركة في الرسم <b>ليست</b> سرعة الإشارة الحقيقية.
+  </div>
+</aside>
+</main>
+
+<!-- GEO vs LEO modal -->
+<div class="modal" id="cmpModal" hidden>
+  <div class="modal-box">
+    <button class="btn close" id="bClose" aria-label="إغلاق">✕</button>
+    <h3>مقارنة بين أنظمة <span class="en">GEO</span> و <span class="en">LEO</span></h3>
+    <div style="color:var(--muted);font-size:13px">المدارات مرسومة <b style="color:#fff">بمقياس رسم حقيقي</b> نسبةً إلى نصف قطر الأرض. لاحظ أن قمر <span class="en">GEO</span> يدور مع الأرض فيبقى فوق المحطة نفسها، بينما يمرّ قمر <span class="en">LEO</span> سريعاً ويحتاج تسليماً (<span class="en">Handover</span>) بين الأقمار.</div>
+    <div class="modal-grid">
+      <svg id="orbit" viewBox="0 0 600 600"></svg>
+      <div>
+        <table class="cmp">
+          <tr><th></th><th class="en">GEO</th><th class="en">LEO</th></tr>
+          <tr><th>الارتفاع</th><td class="g en">35,786 km</td><td class="l en">≈ 500–1,200 km<br>e.g. ~550 km</td></tr>
+          <tr><th>الدورة المدارية</th><td class="g">≈ 23 س 56 د (ثابت نسبياً)</td><td class="l">≈ 95 دقيقة</td></tr>
+          <tr><th>زمن الانتشار المثالي (ذهاب وإياب، 4 قفزات)</th><td class="g en">≈ 477 ms</td><td class="l en">≈ 7 ms</td></tr>
+          <tr><th>زمن الاستجابة العملي النموذجي</th><td class="g en">≈ 550–700 ms</td><td class="l en">≈ 25–60 ms</td></tr>
+          <tr><th>التغطية</th><td class="g">قمر واحد يغطي نحو ثلث الأرض</td><td class="l">بصمة صغيرة؛ تحتاج كوكبة من مئات أو آلاف الأقمار</td></tr>
+          <tr><th>الهوائي على السفينة</th><td class="g">مُثبَّت ميكانيكياً ويوجَّه نحو نقطة ثابتة</td><td class="l">مصفوفة طورية تتبّع الأقمار وتنتقل بينها</td></tr>
+          <tr><th>بنية القمر</th><td class="g">غالباً <span class="en">Bent-pipe</span> شفاف</td><td class="l">غالباً معالجة على متن القمر ووصلات بين الأقمار</td></tr>
+        </table>
+        <div class="rtt">
+          <div style="font-size:12.5px;color:var(--muted)">زمن الانتشار المثالي ذهاباً وإياباً</div>
+          <div class="rtt-row"><span class="en">GEO</span><div class="bar"><i style="width:100%;background:linear-gradient(90deg,var(--blue),var(--orange))"></i></div><span class="en">477 ms</span></div>
+          <div class="rtt-row"><span class="en">LEO</span><div class="bar"><i style="width:1.6%;min-width:4px;background:var(--green)"></i></div><span class="en">≈ 7 ms</span></div>
+        </div>
+        <div class="live" style="margin-top:12px">
+          <div class="live-row"><span>نبضة <span class="en">GEO</span> (اتجاه واحد أرض ← قمر ← أرض)</span><span class="v" id="oGeo">0 ms</span></div>
+          <div class="live-row"><span>نبضة <span class="en">LEO</span> (اتجاه واحد)</span><span class="v" id="oLeo">0 ms</span></div>
+          <div style="font-size:11.5px;color:var(--dim)">الحركة مبطّأة ×10 للنبضات، والدوران مسرّع للتوضيح.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(()=>{
+const NS='http://www.w3.org/2000/svg';
+const $=s=>document.querySelector(s);
+function el(tag,attrs,parent,html){const e=document.createElementNS(NS,tag);if(attrs)for(const k in attrs)e.setAttribute(k,attrs[k]);if(html!=null)e.innerHTML=html;if(parent)parent.appendChild(e);return e;}
+const stage=$('#stage'), inset=$('#inset');
+const C={up:'#4da3ff',down:'#ff9a3c',ip:'#22e4ff',cell:'#7fd8ff',ret:'#3dffa8'};
+const HOP=119.4; // ms, 35,786 km / 299,792 km/s
+const T_RF=2.2;  // animation seconds for one GEO hop at 1x
+
+/* ---------- ambient: stars, waves, leds ---------- */
+(function(){
+  const g=$('#stars');let seed=7;const r=()=>(seed=(seed*16807)%2147483647)/2147483647;
+  for(let i=0;i<150;i++){const y=r()*420;el('circle',{cx:r()*1200,cy:y,r:(r()*1.3+.3).toFixed(2),fill:'#cfe6ff',opacity:(r()*.6+.15).toFixed(2),class:i%5===0?'tw':''},g);}
+  const w=$('#waves');
+  for(let i=0;i<9;i++){const y=495+i*19, x=20+(i*53)%300;el('path',{d:`M${x},${y} q10,-4 20,0 t20,0`,opacity:.8},w);}
+  const leds=$('#leds');
+  for(let c=0;c<3;c++)for(let r2=0;r2<6;r2++)el('rect',{x:764+c*29,y:399+r2*8,width:6,height:3,fill:(r2+c)%3?'#22e4ff':'#3dffa8',opacity:.5,class:'led'},leds);
+})();
+
+/* ---------- scenes ---------- */
+const SCENES=[
+ {title:'تحويل الصوت إلى بيانات رقمية',
+  sub:'يتحدث البحّار في الهاتف فيلتقط الميكروفون موجات الصوت التناظرية. يحوّلها المحوِّل ADC إلى عينات رقمية (0 و 1)، ثم يضغطها مُرمِّز الصوت ويضيف تصحيح الأخطاء FEC، ثم يعدِّل المودم البتّات على موجة حاملة بتقنية QPSK (بتّان لكل رمز).',
+  tags:['Microphone','ADC Sampling','Voice Codec','FEC Encoding','QPSK Modulation'],
+  dur:10, cam:[0,282,480,272], focus:['cShip'], em:[], signal:'Analog → Digital', dir:'Ship (Tx)', inset:'voice', insetT:'رقمنة الصوت على متن السفينة', insetEn:'Voice → Bits → QPSK'},
+ {title:'إرسال الإشارة إلى القمر الصناعي',
+  sub:'يرفع محوّل BUC التردد إلى نطاق Ku ويضخّم القدرة، ثم يوجّه الهوائي المُثبَّت داخل القبة الحزمة نحو القمر رغم تمايل السفينة. تقطع الموجة الراديوية نحو 36,000 km بسرعة الضوء.',
+  tags:['Uplink','14 GHz (illustrative Ku-band)','QPSK Modulation','RF Transmission'],
+  dur:7.5, cam:[0,30,820,465], focus:['cShip','cSat'], em:['up'], signal:'RF · 14 GHz', dir:'Ship → Satellite', inset:'chain', chain:'tx', insetT:'سلسلة الإرسال في محطة السفينة', insetEn:'Ship VSAT Tx Chain'},
+ {title:'استقبال الإشارة ومعالجتها وإعادة بثها',
+  sub:'القمر هنا مُرحِّل شفاف (Bent-pipe): يستقبل الإشارة، يرشّحها، يخفض ترددها من 14 إلى 12 GHz كي لا يتداخل الإرسال مع الاستقبال، يضخّمها ثم يعيد بثها نحو الأرض — دون فك التشكيل أو قراءة البيانات.',
+  tags:['Bent-pipe Transponder','Rx Antenna','Band-pass Filter','Frequency Converter','Power Amplifier (TWTA)'],
+  dur:9, cam:[440,40,320,181], focus:['cSat'], em:['up','down'], signal:'RF · 14 → 12 GHz', dir:'On-board relay', inset:'chain', chain:'sat', insetT:'داخل القمر: مسار المُرحِّل', insetEn:'Transponder Signal Chain'},
+ {title:'استقبال الإشارة في المحطة الأرضية',
+  sub:'يلتقط الهوائي الكبير للمحطة الأرضية الإشارة الضعيفة جداً بعد رحلتها، فيضخّمها مضخّم منخفض الضجيج LNA، ثم يُفكّ تشكيل QPSK وتُصحَّح الأخطاء لاستعادة البتّات الأصلية.',
+  tags:['Downlink','12 GHz (illustrative Ku-band)','Signal Reception','Demodulation'],
+  dur:7.5, cam:[230,30,780,442], focus:['cSat','cGw'], em:['down'], signal:'RF · 12 GHz → Bits', dir:'Satellite → Gateway', inset:'chain', chain:'gw', insetT:'سلسلة الاستقبال في المحطة الأرضية', insetEn:'Gateway Rx Chain'},
+ {title:'توجيه المكالمة عبر شبكة الاتصالات',
+  sub:'تُعبَّأ البيانات الصوتية في حزم IP (RTP/UDP/IP) تعبر الموجّهات والشبكة الأساسية (IMS / Softswitch) التي تحدّد موقع المشترك في مسقط وتوجّه المكالمة إلى المحطة القاعدية المخدِّمة.',
+  tags:['IP Packets (RTP/UDP/IP)','IP Routing','Core Network (IMS)','4G/5G Base Station'],
+  dur:8, cam:[480,290,690,391], focus:['cGw','cRouter','cCore','cTower'], em:['gnd'], signal:'Digital IP packets', dir:'Gateway → Base station', inset:'chain', chain:'core', insetT:'مسار الحزم في الشبكة الأرضية', insetEn:'Terrestrial IP Routing'},
+ {title:'وصول المكالمة إلى المستقبِل',
+  sub:'تبث المحطة القاعدية المكالمة لاسلكياً عبر 4G/5G (VoLTE / VoNR). يرنّ الهاتف، وعند الرد يفكّ مُرمِّز الصوت الحزم ويحوّلها المحوِّل DAC إلى صوت مسموع في السماعة.',
+  tags:['4G/5G Radio','VoLTE / VoNR','Voice Decoder','DAC → Speaker'],
+  dur:9, cam:[830,330,370,210], focus:['cTower','cPhone'], em:['cell'], signal:'RF 4G/5G → Audio', dir:'Base station → Phone', inset:'chain', chain:'phone', insetT:'من الحزم الرقمية إلى صوت مسموع', insetEn:'Bits → Sound'},
+ {title:'اتصال صوتي ثنائي الاتجاه',
+  sub:'المكالمة ثنائية الاتجاه (Full-duplex): صوت المتلقي في مسقط يسلك المسار المعاكس — الشبكة الخلوية ← البوابة ← وصلة صاعدة إلى القمر ← وصلة هابطة إلى السفينة. زمن الانتشار ذهاباً وإياباً ≈ 477 ms، لذا يُلاحَظ تأخّر بسيط بين المتحدثين.',
+  tags:['Full-duplex','Forward Path','Return Path','Ideal RTT ≈ 477 ms'],
+  dur:12, cam:[0,0,1200,680], focus:['cShip','cSat','cGw','cRouter','cCore','cTower','cPhone'], em:['up','down','gnd','cell','rCell','rGnd','rUp','rDown'], signal:'RF + IP (both ways)', dir:'Ship ⇄ Muscat', inset:'rtt', insetT:'ميزانية زمن الانتشار ذهاباً وإياباً', insetEn:'Round-trip Propagation Budget'},
+];
+const CHIP_NAMES=['رقمنة الصوت','الوصلة الصاعدة','المُرحِّل الفضائي','الوصلة الهابطة','التوجيه الأرضي','استقبال المكالمة','ثنائي الاتجاه'];
+
+const EM={
+ up:{path:'pUp',color:C.up,kind:'rf',cls:'ul',interval:.3,travel:T_RF},
+ down:{path:'pDown',color:C.down,kind:'rf',cls:'dl',interval:.3,travel:T_RF},
+ gnd:{path:'gFwd',color:C.ip,kind:'ip',cls:'gnd',interval:.45,travel:3},
+ cell:{path:'rFwd',color:C.cell,kind:'rf',cls:'gnd',interval:.28,travel:1.1},
+ rCell:{path:'rRet',color:C.ret,kind:'rf',cls:'gnd',interval:.3,travel:1.1},
+ rGnd:{path:'gRet',color:C.ret,kind:'ip',cls:'gnd',interval:.5,travel:3},
+ rUp:{path:'pRetUp',color:C.ret,kind:'rf',cls:'ul',interval:.32,travel:T_RF},
+ rDown:{path:'pRetDown',color:C.ret,kind:'rf',cls:'dl',interval:.32,travel:T_RF},
+};
+const PATHS={};for(const k in EM){const p=document.getElementById(EM[k].path);PATHS[EM[k].path]={el:p,len:p.getTotalLength()};}
+
+/* ---------- inset chains ---------- */
+const CHAINS={
+ tx:{nodes:[['Voice Codec','ترميز الصوت'],['Modem\nQPSK + FEC','المودم'],['BUC\nUp-converter','رفع التردد'],['HPA / SSPA','تضخيم القدرة'],['Stabilized\nAntenna','هوائي مُثبَّت']],
+     segs:['Bits','IF (L-band)','RF 14 GHz','RF 14 GHz'],cols:[C.ip,C.ip,C.up,C.up,C.up],
+     note:'الهوائي مُثبَّت على 3 محاور ليبقى موجَّهاً نحو القمر رغم تمايل السفينة وحركتها.'},
+ sat:{nodes:[['Rx Antenna','هوائي الاستقبال'],['Band-pass\nFilter','مرشّح'],['Frequency\nConverter','محوّل التردد'],['Power Amp\n(TWTA)','مضخّم القدرة'],['Tx Antenna','هوائي الإرسال']],
+     segs:['14 GHz','14 GHz','12 GHz','12 GHz'],cols:[C.up,C.up,C.down,C.down,C.down],
+     note:'f_out = f_in − f_LO  →  14 GHz − 2 GHz = 12 GHz  ·  Bent-pipe: لا فك تشكيل ولا معالجة للبيانات على متن القمر.'},
+ gw:{nodes:[['Large Dish','الهوائي الكبير'],['LNA','مضخّم منخفض الضجيج'],['Down-\nconverter','خفض التردد'],['Demodulator\nQPSK','فك التشكيل'],['FEC Decoder\n→ IP','فك الترميز']],
+     segs:['RF 12 GHz','RF 12 GHz','IF','Bits'],cols:[C.down,C.down,C.down,C.ip,C.ip],
+     note:'الإشارة تصل ضعيفة جداً بعد ~36,000 km، لذا تستخدم البوابة هوائياً كبيراً ومضخّماً منخفض الضجيج.'},
+ core:{nodes:[['Gateway\nModem','مودم البوابة'],['IP Router','الموجّه'],['IMS /\nSoftswitch','التحكم بالمكالمة'],['SBC / MGW','بوابة الوسائط'],['eNodeB /\ngNodeB','المحطة القاعدية']],
+     segs:['IP','IP','SIP + RTP','RTP/IP'],cols:[C.ip,C.ip,C.ip,C.ip,C.ip],ip:true,
+     note:'إشارات التحكم (SIP) تُنشئ المكالمة، وحزم الصوت (RTP) تحمل الكلام كل ~20 ms.'},
+ phone:{nodes:[['gNodeB\nRadio','بث خلوي'],['Phone RF +\nDemod','استقبال الهاتف'],['RTP / IP\nPackets','حزم الصوت'],['Voice Decoder\n+ DAC','فك الترميز'],['Speaker','السماعة']],
+     segs:['RF 4G/5G','Bits','Voice frames','Analog audio'],cols:[C.cell,C.cell,C.ip,C.ip,C.ret],
+     note:'الهاتف العادي لا يتصل بالقمر مباشرة في هذا السيناريو — يصله الاتصال عبر الشبكة الخلوية.'},
+};
+let insetState={};
+function buildInset(sc){
+  inset.innerHTML='';insetState={type:sc.inset};
+  $('#insetTitle').textContent=sc.insetT;$('#insetEn').textContent=sc.insetEn;
+  if(sc.inset==='chain'){
+    const ch=CHAINS[sc.chain];insetState.ch=ch;insetState.boxes=[];
+    el('rect',{x:0,y:0,width:1000,height:210,fill:'transparent'},inset);
+    ch.nodes.forEach((n,i)=>{
+      const cx=100+i*200;
+      if(i<4){
+        el('line',{x1:cx+78,y1:92,x2:cx+122,y2:92,stroke:ch.cols[i+1],'stroke-width':2,opacity:.6},inset);
+        el('path',{d:`M${cx+116},86 L${cx+124},92 L${cx+116},98`,fill:'none',stroke:ch.cols[i+1],'stroke-width':2,opacity:.6},inset);
+        el('text',{x:cx+100,y:42,'text-anchor':'middle','font-size':13,class:'m',fill:ch.cols[i+1]},inset).textContent=ch.segs[i];
+      }
+      const g=el('g',{},inset);
+      const r=el('rect',{x:cx-78,y:58,width:156,height:68,rx:10,fill:'#0a1d3c',stroke:'rgba(110,180,255,.35)','stroke-width':1.5},g);
+      const lines=n[0].split('\n');
+      lines.forEach((ln,j)=>{el('text',{x:cx,y:92+(j-(lines.length-1)/2)*18+5,'text-anchor':'middle','font-size':15,class:'m',fill:'#e6f4ff','font-weight':600},g).textContent=ln;});
+      el('text',{x:cx,y:150,'text-anchor':'middle','font-size':15,fill:'#9fb6d8'},g).textContent=n[1];
+      insetState.boxes.push({r,cx});
+    });
+    el('text',{x:500,y:192,'text-anchor':'middle','font-size':13.5,fill:'#8ea5c9'},inset).textContent=ch.note;
+    const pk=el('g',{},inset);
+    if(ch.ip){el('rect',{x:-11,y:-7,width:22,height:14,rx:2,fill:'#061a33',stroke:C.ip,'stroke-width':1.6},pk);el('text',{x:0,y:4,'text-anchor':'middle','font-size':8,class:'m',fill:C.ip},pk).textContent='IP';}
+    else{el('circle',{r:12,fill:'none','stroke-opacity':.4,'stroke-width':1.5},pk);el('circle',{r:6,filter:'url(#glow)'},pk);}
+    insetState.pk=pk;
+  } else if(sc.inset==='voice'){
+    const P=[['Microphone','الميكروفون — صوت تناظري'],['ADC Sampling','أخذ العينات والتكميم'],['Binary Data','بيانات رقمية'],['Codec + FEC','الترميز وتصحيح الأخطاء'],['QPSK Modulator','التعديل على الحامل']];
+    insetState.panels=[];
+    P.forEach((p,i)=>{
+      const x=10+i*198;const g=el('g',{},inset);
+      el('rect',{x,y:22,width:184,height:128,rx:10,fill:'#0a1d3c',stroke:'rgba(110,180,255,.35)'},g);
+      el('text',{x:x+92,y:170,'text-anchor':'middle','font-size':14,class:'m',fill:'#e6f4ff','font-weight':600},g).textContent=p[0];
+      el('text',{x:x+92,y:192,'text-anchor':'middle','font-size':13.5,fill:'#9fb6d8'},g).textContent=p[1];
+      if(i<4)el('path',{d:`M${x+186},86 l10,0 m-5,-5 l5,5 l-5,5`,stroke:'#22e4ff','stroke-width':2,fill:'none'},inset);
+      insetState.panels.push(g);
+    });
+    // mic
+    el('rect',{x:24,y:62,width:16,height:28,rx:8,fill:'#9fb3cc'},insetState.panels[0]);
+    el('path',{d:'M20,82 q12,16 24,0 M32,96 v8',stroke:'#9fb3cc','stroke-width':2,fill:'none'},insetState.panels[0]);
+    insetState.w0=el('path',{fill:'none',stroke:'#22e4ff','stroke-width':2},insetState.panels[0]);
+    insetState.w1=el('g',{},insetState.panels[1]);
+    insetState.w2=el('text',{x:498,y:60,'font-size':15,class:'m',fill:'#3dffa8','text-anchor':'middle'},insetState.panels[2]);
+    insetState.w2b=el('text',{x:498,y:88,'font-size':15,class:'m',fill:'#3dffa8','text-anchor':'middle',opacity:.75},insetState.panels[2]);
+    insetState.w2c=el('text',{x:498,y:116,'font-size':15,class:'m',fill:'#3dffa8','text-anchor':'middle',opacity:.5},insetState.panels[2]);
+    const gg=el('g',{},insetState.panels[3]);insetState.blk=[];
+    for(let r=0;r<4;r++)for(let c=0;c<6;c++)insetState.blk.push(el('rect',{x:622+c*24,y:40+r*22,width:18,height:14,rx:2,fill:c>3?'#ff9a3c':'#22e4ff',opacity:.2},gg));
+    el('text',{x:690,y:140,'text-anchor':'middle','font-size':10,class:'m',fill:'#8ea5c9'},gg).textContent='data + parity';
+    const q=insetState.panels[4];
+    el('line',{x1:806,y1:66,x2:870,y2:66,stroke:'#3a5a86'},q);el('line',{x1:838,y1:34,x2:838,y2:98,stroke:'#3a5a86'},q);
+    insetState.qp=[];[[22,-22,'00'],[-22,-22,'01'],[-22,22,'11'],[22,22,'10']].forEach(([dx,dy,l])=>{
+      const c=el('circle',{cx:838+dx,cy:66+dy,r:5,fill:'#4da3ff',opacity:.4},q);
+      el('text',{x:838+dx*1.75,y:66+dy*1.55+4,'text-anchor':'middle','font-size':10,class:'m',fill:'#8ea5c9'},q).textContent=l;
+      insetState.qp.push(c);});
+    insetState.wq=el('path',{fill:'none',stroke:'#4da3ff','stroke-width':1.8},q);
+    el('text',{x:945,y:38,'text-anchor':'middle','font-size':10,class:'m',fill:'#8ea5c9'},q).textContent='2 bits/symbol';
+  } else if(sc.inset==='rtt'){
+    const segs=[['Ship → Sat',C.up,'وصلة صاعدة'],['Sat → Gateway',C.down,'وصلة هابطة'],['Gateway → Sat',C.ret,'رد: صاعدة'],['Sat → Ship',C.ret,'رد: هابطة']];
+    segs.forEach((s,i)=>{const x=40+i*230;
+      el('rect',{x,y:70,width:226,height:34,rx:6,fill:s[1],opacity:.22,stroke:s[1]},inset);
+      el('text',{x:x+113,y:93,'text-anchor':'middle','font-size':14,class:'m',fill:'#e6f4ff','font-weight':600},inset).textContent=s[0];
+      el('text',{x:x+113,y:58,'text-anchor':'middle','font-size':13.5,fill:'#9fb6d8'},inset).textContent=s[2];
+      el('text',{x:x+113,y:126,'text-anchor':'middle','font-size':13,class:'m',fill:s[1]},inset).textContent='≈ 119.4 ms';
+    });
+    el('text',{x:500,y:28,'text-anchor':'middle','font-size':14,class:'m',fill:'#cfe6ff'},inset).textContent='4 × 35,786 km ÷ 299,792 km/s ≈ 477 ms';
+    el('text',{x:500,y:186,'text-anchor':'middle','font-size':13.5,fill:'#8ea5c9'},inset).textContent='بالإضافة إلى زمن المعالجة (الترميز، المودم، الشبكة الأرضية) والمسافة المائلة — لذا يكون الزمن العملي أعلى.';
+    insetState.cur=el('line',{x1:40,y1:62,x2:40,y2:112,stroke:'#fff','stroke-width':3},inset);
+    insetState.curT=el('text',{x:40,y:150,'text-anchor':'middle','font-size':14,class:'m',fill:'#fff'},inset);
+  }
+}
+function updateInset(sc,p,t){
+  const s=insetState;
+  if(s.type==='chain'){
+    const period=3.2, u=(t%period)/period; const x=100+u*800;
+    s.pk.setAttribute('transform',`translate(${x},92)`);
+    const idx=Math.min(4,Math.floor((x-100+100)/200));
+    const col=s.ch.cols[Math.min(4,Math.max(0,Math.round((x-100)/200)))];
+    s.pk.querySelectorAll('circle').forEach(c=>{c.setAttribute('fill',c.getAttribute('r')==='6'?col:'none');c.setAttribute('stroke',col);});
+    s.boxes.forEach((b,i)=>{const on=Math.abs(x-b.cx)<80;b.r.setAttribute('stroke',on?col:'rgba(110,180,255,.35)');b.r.setAttribute('fill',on?'#0f2a55':'#0a1d3c');});
+  } else if(s.type==='voice'){
+    s.panels.forEach((g,i)=>g.setAttribute('opacity',p>=i*0.17?1:.28));
+    const sig=x=>Math.sin(x*0.09+t*4)*0.6+Math.sin(x*0.23+t*2.3)*0.4;
+    let d='';for(let x=0;x<=128;x+=3){d+=(x?'L':'M')+(52+x)+','+(86-26*sig(x)*(0.6+0.4*Math.sin(t*1.5)))}
+    s.w0.setAttribute('d',d);
+    let h='';for(let k=0;k<13;k++){const x=k*10;const v=Math.round(sig(x)*4)/4;const yy=86-v*36;h+=`<line x1="${218+20+x}" y1="86" x2="${218+20+x}" y2="${yy}" stroke="#22e4ff" stroke-width="2"/><circle cx="${218+20+x}" cy="${yy}" r="3" fill="#3dffa8"/>`;}
+    h+=`<line x1="232" y1="86" x2="372" y2="86" stroke="#3a5a86"/>`;s.w1.innerHTML=h;
+    const bits=n=>{let o='';for(let k=0;k<12;k++)o+=((Math.sin((k+n)*12.9898+Math.floor(t*6+n)*78.233)*43758.5)%1+1)%1>.5?'1':'0';return o};
+    s.w2.textContent=bits(0);s.w2b.textContent=bits(3);s.w2c.textContent=bits(7);
+    s.blk.forEach((b,i)=>b.setAttribute('opacity',(Math.sin(t*5+i*1.7)>0.2&&p>.5)?.9:.18));
+    const sym=Math.floor(t*2.5)%4;const seq=[0,2,1,3,3,0,2,1];
+    s.qp.forEach((c,i)=>{const on=i===seq[Math.floor(t*2.5)%8]&&p>.68;c.setAttribute('opacity',on?1:.35);c.setAttribute('r',on?7:5);c.setAttribute('filter',on?'url(#glow)':'');});
+    let w='';const ph=[Math.PI/4,3*Math.PI/4,5*Math.PI/4,7*Math.PI/4];
+    for(let x=0;x<=160;x+=2){const sx=Math.floor((x+t*40)/40);const s2=seq[((sx%8)+8)%8];w+=(x?'L':'M')+(814+x*.95)+','+(130-11*Math.sin((x+t*40)*0.45+ph[s2]))}
+    s.wq.setAttribute('d',w);
+  } else if(s.type==='rtt'){
+    const cyc=4*T_RF;const u=(t%cyc)/cyc;const x=40+u*920;
+    s.cur.setAttribute('x1',x);s.cur.setAttribute('x2',x);s.curT.setAttribute('x',x);s.curT.textContent=(u*4*HOP).toFixed(0)+' ms';
+  }
+}
+
+/* ---------- pulses ---------- */
+const layer=$('#pulses');let pulses=[];let emAcc={};
+function spawn(key){
+  const em=EM[key];const g=el('g',{class:'pulse '+em.cls},layer);
+  let tail=null;
+  if(em.kind==='rf'){
+    tail=el('line',{stroke:em.color,'stroke-width':3,'stroke-linecap':'round',opacity:.55},g);
+    el('circle',{r:11,fill:'none',stroke:em.color,'stroke-opacity':.35,'stroke-width':1.5},g);
+    el('circle',{r:5,fill:em.color,filter:'url(#glow)'},g);
+  } else {
+    el('rect',{x:-11,y:-7,width:22,height:14,rx:2,fill:'#061a33',stroke:em.color,'stroke-width':1.6},g);
+    el('text',{x:0,y:3.5,'text-anchor':'middle','font-size':8,class:'mono',fill:em.color,'font-weight':700},g).textContent='IP';
+  }
+  pulses.push({g,em,s:0,tail});
+}
+function stepPulses(dt,keys){
+  keys.forEach(k=>{emAcc[k]=(emAcc[k]||EM[k].interval)+dt;while(emAcc[k]>=EM[k].interval){emAcc[k]-=EM[k].interval;spawn(k);}});
+  pulses=pulses.filter(p=>{
+    p.s+=dt/p.em.travel;
+    if(p.s>=1){p.g.remove();return false;}
+    const P=PATHS[p.em.path];const pt=P.el.getPointAtLength(p.s*P.len);
+    p.g.setAttribute('transform',`translate(${pt.x.toFixed(1)},${pt.y.toFixed(1)})`);
+    if(p.tail){const q=P.el.getPointAtLength(Math.max(0,p.s-.07)*P.len);p.tail.setAttribute('x2',(q.x-pt.x).toFixed(1));p.tail.setAttribute('y2',(q.y-pt.y).toFixed(1));}
+    const fade=Math.min(1,p.s*12,(1-p.s)*12);p.g.setAttribute('opacity',fade.toFixed(2));
+    return true;
+  });
+}
+function clearPulses(){pulses.forEach(p=>p.g.remove());pulses=[];emAcc={};}
+
+/* ---------- state ---------- */
+let idx=0,t=0,playing=true,speed=1,focus='all',detailed=false,last=performance.now(),clock=0;
+let vb=[0,0,1200,680];
+const timeline=$('#timeline');
+SCENES.forEach((s,i)=>{const b=document.createElement('button');b.className='chip';b.innerHTML=`<b>0${i+1}</b><span>${CHIP_NAMES[i]}</span><i class="bar"></i>`;b.onclick=()=>goScene(i);timeline.appendChild(b);});
+const chips=[...timeline.children];
+
+function activeKeys(){
+  const sc=SCENES[idx];const set=new Set(sc.em);
+  if(focus==='ul'){set.add('up');set.add('rUp');}
+  if(focus==='dl'){set.add('down');set.add('rDown');}
+  return [...set];
+}
+function goScene(i){
+  idx=Math.max(0,Math.min(SCENES.length-1,i));t=0;clearPulses();
+  const sc=SCENES[idx];
+  const cap=$('#caption');cap.classList.remove('swap');void cap.offsetWidth;cap.classList.add('swap');
+  $('#capNo').textContent=idx+1;$('#capTitle').textContent=sc.title;$('#capSub').textContent=sc.sub;
+  $('#capTags').innerHTML=sc.tags.map(x=>`<span class="tag">${x}</span>`).join('');
+  document.querySelectorAll('#stage .comp').forEach(c=>c.classList.toggle('focus',sc.focus.includes(c.id)));
+  chips.forEach((c,j)=>{c.classList.toggle('on',j===idx);c.classList.toggle('done',j<idx);c.style.setProperty('--p',0);});
+  $('#lvScene').textContent=`${idx+1} / 7`;$('#lvSignal').textContent=sc.signal;$('#lvDir').textContent=sc.dir;
+  updateLinks();buildInset(sc);updateInsetVisibility();
+}
+function updateLinks(){
+  const keys=activeKeys();const on=new Set(keys.map(k=>EM[k].path));
+  document.querySelectorAll('#links .link').forEach(l=>l.classList.toggle('on',on.has(l.id)));
+}
+function updateInsetVisibility(){
+  const show=detailed||[0,2,5,6].includes(idx);
+  $('#insetCard').classList.toggle('hide',!show);
+}
+function latency(){
+  const T=T_RF;
+  switch(idx){
+    case 0:return [0,'—','Codec frame ≈ 20 ms'];
+    case 1:{const v=Math.min(1,t/T)*HOP;return [v,v.toFixed(1)+' ms','≈ ×'+(T/HOP*1000).toFixed(0)];}
+    case 2:return [HOP,'119.4 ms','+ on-board < 1 ms'];
+    case 3:{const v=HOP+Math.min(1,t/T)*HOP;return [v,v.toFixed(1)+' ms','≈ ×'+(T/HOP*1000).toFixed(0)];}
+    case 4:return [2*HOP,'≈ 238.7 ms +','+ terrestrial delay'];
+    case 5:return [2*HOP,'≈ 239 ms','one-way (ideal)'];
+    case 6:{const cyc=4*T;const v=(t%cyc)/cyc*4*HOP;return [v,v.toFixed(1)+' ms','≈ ×'+(T/HOP*1000).toFixed(0)];}
+  }
+}
+
+/* scene-specific ambient on main stage */
+function sceneFx(p,real){
+  // ship bob
+  const bob=Math.sin(real*1.3)*1.6;$('#shipBody').setAttribute('transform',`translate(220,${(462+bob).toFixed(2)}) rotate(${(Math.sin(real*1.1)*0.6).toFixed(2)})`);
+  $('#speech').setAttribute('opacity',(idx===0||idx===6)?(0.5+0.5*Math.sin(real*6)).toFixed(2):0);
+  $('#satHalo').setAttribute('opacity',idx===2?(0.6+0.4*Math.sin(real*4)).toFixed(2):.35);
+  document.querySelectorAll('#leds .led').forEach((l,i)=>l.setAttribute('opacity',(idx===4||idx===6)?(Math.sin(real*8+i*2.1)>0?.95:.25):.4));
+  $('#towerRings').setAttribute('opacity',(idx===5||idx===6||idx===4&&p>.7)?(0.4+0.6*Math.abs(Math.sin(real*3))).toFixed(2):0);
+  // phone state
+  let st='idle';
+  if(idx===5){st=p<.25?'idle':p<.62?'ring':'talk';} else if(idx===6) st='talk';
+  const pb=$('#phoneBody'),rings=$('#phRings');
+  if(st==='ring'){const sh=Math.sin(real*40)*1.6;pb.setAttribute('transform',`translate(${1090+sh},500) rotate(${sh})`);rings.setAttribute('opacity',(0.5+0.5*Math.sin(real*10)).toFixed(2));
+    $('#phText').textContent='INCOMING';$('#phText2').textContent='+870 VSAT';$('#phScreen').setAttribute('fill','#123c63');$('#phBtn').setAttribute('fill','#2ac46a');}
+  else if(st==='talk'){pb.setAttribute('transform','translate(1090,500)');rings.setAttribute('opacity',(0.3+0.4*Math.abs(Math.sin(real*5))).toFixed(2));
+    const secs=Math.floor(idx===6?t+6:(p-.62)*SCENES[5].dur);$('#phText').textContent='CONNECTED';$('#phText2').textContent='00:'+String(Math.max(0,secs)).padStart(2,'0');$('#phScreen').setAttribute('fill','#0f4a3a');$('#phBtn').setAttribute('fill','#e2483d');}
+  else {pb.setAttribute('transform','translate(1090,500)');rings.setAttribute('opacity',0);$('#phText').textContent='IDLE';$('#phText2').textContent='VoLTE';$('#phScreen').setAttribute('fill','#0b2a4a');$('#phBtn').setAttribute('fill','#2ac46a');}
+}
+
+/* ---------- main loop ---------- */
+function frame(now){
+  const rdt=Math.min(.05,(now-last)/1000);last=now;clock+=rdt;
+  const dt=playing?rdt*speed:0;t+=dt;
+  const sc=SCENES[idx];
+  if(t>=sc.dur&&idx<SCENES.length-1&&playing){goScene(idx+1);}
+  const p=Math.min(1,t/sc.dur);
+  chips[idx].style.setProperty('--p',p);
+  // camera
+  const k=Math.min(1,rdt*2.6);for(let i=0;i<4;i++)vb[i]+=(sc.cam[i]-vb[i])*k;
+  stage.setAttribute('viewBox',vb.map(v=>v.toFixed(2)).join(' '));
+  stepPulses(dt,idx===0?activeKeys():(t>.25?activeKeys():[]));
+  const L=latency();$('#lvLat').textContent=L[1];$('#lvBar').style.width=(L[0]/(4*HOP)*100).toFixed(1)+'%';$('#lvSlow').textContent=L[2];
+  sceneFx(p,clock);
+  iclock+=dt;updateInset(sc,p,sc.inset==='rtt'?t:iclock);
+  requestAnimationFrame(frame);
+}
+let iclock=0;
+
+/* ---------- controls ---------- */
+function setPlaying(v){playing=v;$('#tPlay').textContent=v?'إيقاف مؤقت':'تشغيل';$('#icPlay').innerHTML=v?'<path d="M7 5h4v14H7zM13 5h4v14h-4z"/>':'<path d="M7 4l13 8-13 8z"/>';}
+$('#bPlay').onclick=()=>setPlaying(!playing);
+$('#bRestart').onclick=()=>{goScene(0);setPlaying(true);};
+$('#bNext').onclick=()=>goScene(idx+1);
+$('#bPrev').onclick=()=>goScene(idx-1);
+function seg(id,fn){const s=$(id);s.querySelectorAll('button').forEach(b=>b.onclick=()=>{s.querySelectorAll('button').forEach(x=>x.classList.remove('on'));b.classList.add('on');fn(b.dataset.v);});}
+seg('#segSpeed',v=>speed=+v);
+const FOCUS_NOTES={
+ ul:'<b>Uplink — الوصلة الصاعدة:</b> من محطة أرضية (السفينة أو البوابة) إلى القمر بتردد <span class="en">14 GHz</span>. تحتاج قدرة إرسال عالية (<span class="en">BUC / HPA</span>) وتوجيهاً دقيقاً للهوائي لتجنّب التداخل مع الأقمار المجاورة.',
+ dl:'<b>Downlink — الوصلة الهابطة:</b> من القمر إلى الأرض بتردد <span class="en">12 GHz</span>. قدرة القمر محدودة فتصل الإشارة ضعيفة جداً، لذا تُستخدم هوائيات كبيرة ومضخّمات منخفضة الضجيج <span class="en">LNA / LNB</span>. اختلاف الترددين يمنع تداخل الإرسال مع الاستقبال.'
+};
+seg('#segFocus',v=>{focus=v;stage.classList.remove('focus-ul','focus-dl');if(v!=='all')stage.classList.add('focus-'+v);
+  const n=$('#focusNote');n.innerHTML=FOCUS_NOTES[v]||'';n.classList.toggle('show',v!=='all');clearPulses();updateLinks();});
+seg('#segView',v=>{detailed=v==='detailed';document.body.classList.toggle('detailed',detailed);updateInsetVisibility();});
+document.addEventListener('keydown',e=>{if(e.target.tagName==='BUTTON'&&e.key===' ')return;
+  if(e.key===' '){e.preventDefault();setPlaying(!playing);} if(e.key==='ArrowLeft')goScene(idx+1); if(e.key==='ArrowRight')goScene(idx-1); if(e.key==='Escape'){closeInfo();closeCmp();}});
+
+/* ---------- component info ---------- */
+const INFO={
+ ship:{t:'محطة VSAT البحرية',en:'Maritime VSAT Terminal',d:'طرف الاتصال على السفينة. يحوّل صوت البحّار إلى إشارة راديوية ويرسلها إلى القمر. السفينة لا تستخدم هاتفاً خلوياً عادياً، بل محطة VSAT مخصّصة.',
+  li:['<span class="en">Stabilized Antenna</span>: هوائي (~1 m) داخل قبة يُثبَّت على 3 محاور ويتتبّع القمر رغم تمايل السفينة.','<span class="en">Modem</span>: يضيف تصحيح الأخطاء <span class="en">FEC</span> ويعدّل البتّات بتقنية <span class="en">QPSK</span>.','<span class="en">BUC</span>: يرفع التردد من <span class="en">L-band</span> إلى <span class="en">14 GHz</span> ويضخّمه.','<span class="en">LNB</span>: يستقبل الوصلة الهابطة (مسار الرد) عند <span class="en">12 GHz</span>.']},
+ sat:{t:'قمر اتصالات ثابت (GEO)',en:'GEO Communication Satellite · Bent-pipe',d:'يدور فوق خط الاستواء على ارتفاع 35,786 km بنفس سرعة دوران الأرض، فيبدو ثابتاً في السماء. في هذا السيناريو يعمل كمُرحِّل شفاف: يكرّر الإشارة دون فكّ تشكيلها.',
+  li:['<span class="en">Rx Antenna</span>: يلتقط الوصلة الصاعدة.','<span class="en">Band-pass Filter</span>: يعزل قناة المرسِل ويرفض الضجيج.','<span class="en">Frequency Converter</span>: يخفض <span class="en">14 → 12 GHz</span> بمذبذب محلي <span class="en">LO = 2 GHz</span>.','<span class="en">TWTA</span>: مضخّم أنبوبي يرفع القدرة قبل إعادة البث.','<span class="en">Tx Antenna</span>: يبث الحزمة نحو منطقة التغطية.']},
+ gw:{t:'المحطة الأرضية (البوابة)',en:'Ground Gateway / Teleport',d:'محطة كبيرة على اليابسة تربط شبكة القمر بالشبكات الأرضية. تستقبل الوصلة الهابطة من السفينة وترسل مسار الرد صعوداً إلى القمر.',
+  li:['هوائي قطع مكافئ كبير (عادةً عدة أمتار) لالتقاط الإشارة الضعيفة.','<span class="en">LNA</span>: تضخيم منخفض الضجيج.','<span class="en">Demodulator + FEC Decoder</span>: استعادة البتّات.','<span class="en">Hub / Modem</span>: تحويل البيانات إلى حزم <span class="en">IP</span> وتسليمها للشبكة الأرضية.']},
+ router:{t:'الموجّه',en:'IP Router',d:'يقرأ عنوان كل حزمة IP ويرسلها في أفضل مسار عبر الألياف البصرية نحو الشبكة الأساسية لمشغّل الاتصالات.',li:['يعمل على الطبقة الثالثة <span class="en">(Layer 3)</span>.','يعطي أولوية لحزم الصوت <span class="en">(QoS / DSCP EF)</span> لتقليل التأخير والارتعاش.']},
+ core:{t:'الشبكة الأساسية',en:'Telecommunication Core Network',d:'مركز التحكّم بالمكالمات: يتحقّق من المشترك، يحدّد موقعه، وينشئ المكالمة ثم يوجّه الصوت إلى الشبكة الخلوية في مسقط.',
+  li:['<span class="en">IMS / Softswitch</span>: إنشاء المكالمة وإدارتها عبر <span class="en">SIP</span>.','<span class="en">SBC / Media Gateway</span>: الربط بين شبكة مزوّد الخدمة الفضائية والمشغّل الخلوي.','<span class="en">HSS / UDM</span>: قاعدة بيانات المشتركين وموقعهم.','الصوت ينتقل كحزم <span class="en">RTP</span> كل ~20 ms.']},
+ tower:{t:'المحطة القاعدية الخلوية',en:'4G/5G Base Station — eNodeB / gNodeB',d:'تحوّل حزم IP القادمة من الشبكة الأساسية إلى موجات راديوية خلوية تصل إلى هاتف المستخدم، والعكس في مسار الرد.',
+  li:['صوت عبر <span class="en">VoLTE</span> (4G) أو <span class="en">VoNR</span> (5G).','تعديل <span class="en">OFDM</span> مع <span class="en">QPSK…256QAM</span> حسب جودة القناة.','مسافة قصيرة (كيلومترات) لذا زمن الانتشار ضئيل جداً.']},
+ phone:{t:'الهاتف المحمول في مسقط',en:'Smartphone on 4G/5G',d:'هاتف عادي يستقبل المكالمة من الشبكة الخلوية — لا يتواصل مع القمر مباشرة في هذا السيناريو.',
+  li:['يفكّ تشكيل الإشارة الخلوية ويستخرج حزم الصوت.','مُرمِّز الصوت (<span class="en">AMR-WB / EVS</span>) يعيد بناء الإطارات الصوتية.','<span class="en">DAC</span> يحوّل العينات الرقمية إلى إشارة تناظرية تشغّل السماعة.','الميكروفون يبدأ مسار الرد (باللون الأخضر).']},
+};
+const infoCard=$('#infoCard');
+function openInfo(k){const d=INFO[k];if(!d)return;
+  infoCard.innerHTML=`<button class="x" aria-label="إغلاق">✕</button><h4>${d.t}</h4><span class="en t">${d.en}</span><p>${d.d}</p><ul>${d.li.map(x=>`<li>${x}</li>`).join('')}</ul>`;
+  infoCard.hidden=false;infoCard.querySelector('.x').onclick=closeInfo;}
+function closeInfo(){infoCard.hidden=true;}
+document.querySelectorAll('#stage .comp').forEach(c=>c.addEventListener('click',e=>{e.stopPropagation();openInfo(c.dataset.info);}));
+stage.addEventListener('click',closeInfo);
+
+/* ---------- GEO vs LEO modal ---------- */
+const modal=$('#cmpModal'),orbit=$('#orbit');let cmpOpen=false,oStart=0;
+(function buildOrbit(){
+  const R=40,cx=300,cy=300,rG=R*42164/6371,rL=R*(6371+550)/6371;
+  for(let i=0;i<80;i++)el('circle',{cx:Math.random()*600,cy:Math.random()*600,r:Math.random()*1.1+.2,fill:'#cfe6ff',opacity:Math.random()*.5+.1},orbit);
+  el('circle',{cx,cy,r:rG,fill:'none',stroke:'rgba(255,154,60,.45)','stroke-dasharray':'4 6'},orbit);
+  el('circle',{cx,cy,r:rL,fill:'none',stroke:'rgba(61,255,168,.7)','stroke-width':1.2},orbit);
+  const earth=el('g',{id:'oEarth'},orbit);
+  el('circle',{cx,cy,r:R,fill:'#1366b5',stroke:'#7fd8ff','stroke-width':1.2},earth);
+  el('path',{d:`M${cx-18},${cy-20} q10,-8 20,0 q6,10 -4,18 q-12,4 -16,-18z M${cx+8},${cy+6} q10,-4 16,6 q-6,12 -16,6z`,fill:'#2f8f5a',opacity:.9},earth);
+  el('circle',{cx,cy:cy-R,r:3.5,fill:'#fff'},earth);
+  el('text',{x:16,y:28,'font-size':14,fill:'#ffb877'},orbit).textContent='GEO · 35,786 km';
+  el('text',{x:16,y:48,'font-size':14,fill:'#3dffa8'},orbit).textContent='LEO · ~550 km';
+  el('text',{x:16,y:584,'font-size':12,fill:'#7fa0cc'},orbit).textContent='TO SCALE · Earth R = 6,371 km';
+  el('line',{id:'oLink',stroke:'#4da3ff','stroke-width':1.5,'stroke-dasharray':'4 4',opacity:.6},orbit);
+  el('circle',{id:'oPulse',r:5,fill:'#22e4ff',filter:'url(#glow)'},orbit);
+  const gs=el('g',{id:'oGeoSat'},orbit);el('rect',{x:-6,y:-6,width:12,height:12,fill:'#ffd27a'},gs);el('rect',{x:-20,y:-3,width:12,height:6,fill:'#3b6fd6'},gs);el('rect',{x:8,y:-3,width:12,height:6,fill:'#3b6fd6'},gs);
+  el('text',{x:0,y:-12,'text-anchor':'middle','font-size':12,fill:'#ffd27a'},gs).textContent='GEO';
+  el('circle',{id:'oLeoSat',r:4,fill:'#3dffa8',filter:'url(#glow)'},orbit);
+  el('line',{id:'oLeoLink',stroke:'#3dffa8','stroke-width':2,opacity:0},orbit);
+  el('text',{id:'oLeoTxt',x:300,y:370,'text-anchor':'middle','font-size':12,fill:'#3dffa8'},orbit).textContent='LEO pass → handover';
+  Object.assign(orbit.dataset,{R,cx,cy,rG,rL});
+})();
+function orbitFrame(now){
+  if(!cmpOpen)return;
+  const tt=(now-oStart)/1000;const R=40,cx=300,cy=300,rG=+orbit.dataset.rG,rL=+orbit.dataset.rL;
+  const th=2*Math.PI*tt/30; // Earth: 1 rev / 30 s (sped up)
+  $('#oEarth').setAttribute('transform',`rotate(${th*180/Math.PI} ${cx} ${cy})`);
+  const P=(r,a)=>[cx+r*Math.sin(a),cy-r*Math.cos(a)];
+  const [gx,gy]=P(rG,th),[sx,sy]=P(R,th);
+  $('#oGeoSat').setAttribute('transform',`translate(${gx},${gy})`);
+  const L=$('#oLink');L.setAttribute('x1',sx);L.setAttribute('y1',sy);L.setAttribute('x2',gx);L.setAttribute('y2',gy);
+  const cyc=2*HOP*10/1000; // one-way ground→sat→ground ×10 slow-mo
+  const u=(tt%cyc)/cyc;const f=u<.5?u*2:(1-u)*2;
+  $('#oPulse').setAttribute('cx',sx+(gx-sx)*f);$('#oPulse').setAttribute('cy',sy+(gy-sy)*f);
+  $('#oGeo').textContent=(u*2*HOP).toFixed(0)+' ms';
+  const thL=2*Math.PI*tt/(30/15); // LEO ~15x faster than Earth rotation
+  const [lx,ly]=P(rL,thL);$('#oLeoSat').setAttribute('cx',lx);$('#oLeoSat').setAttribute('cy',ly);
+  let dA=((thL-th)%(2*Math.PI)+2*Math.PI)%(2*Math.PI);if(dA>Math.PI)dA=2*Math.PI-dA;
+  const vis=dA<0.45;const LL=$('#oLeoLink');LL.setAttribute('x1',sx);LL.setAttribute('y1',sy);LL.setAttribute('x2',lx);LL.setAttribute('y2',ly);LL.setAttribute('opacity',vis?.95:0);
+  $('#oLeo').textContent=vis?'≈ 3.7 ms':'— (out of view)';
+  requestAnimationFrame(orbitFrame);
+}
+function openCmp(){modal.hidden=false;cmpOpen=true;oStart=performance.now();requestAnimationFrame(orbitFrame);}
+function closeCmp(){modal.hidden=true;cmpOpen=false;}
+$('#bCmp').onclick=openCmp;$('#bClose').onclick=closeCmp;modal.addEventListener('click',e=>{if(e.target===modal)closeCmp();});
+
+/* ---------- go ---------- */
+goScene(0);vb=[...SCENES[0].cam].map((v,i)=>[0,0,1200,680][i]);
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
